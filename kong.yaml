@@ -1,0 +1,170 @@
+_format_version: "3.0"
+_transform: true
+
+# Сервисы
+services:
+  # Auth Service - аутентификация и авторизация
+  - name: auth-service
+    url: http://auth-service:3001
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/auth
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          headers:
+            - Authorization
+            - Content-Type
+          credentials: true
+          max_age: 3600
+
+  # Users Service - управление пользователями и техниками
+  - name: users-service
+    url: http://users-service:3002
+    routes:
+      - name: users-routes
+        paths:
+          - /api/users
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          credentials: true
+      - name: jwt
+        config:
+          secret_is_base64: false
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+
+  # Tasks Service - управление заявками и задачами
+  - name: tasks-service
+    url: http://tasks-service:3003
+    routes:
+      - name: tasks-routes
+        paths:
+          - /api/tasks
+          - /api/orders
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          credentials: true
+      - name: jwt
+        config:
+          secret_is_base64: false
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+
+  # Schedule Service - планирование и календарь
+  - name: schedule-service
+    url: http://schedule-service:3004
+    routes:
+      - name: schedule-routes
+        paths:
+          - /api/schedule
+          - /api/calendar
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          credentials: true
+      - name: jwt
+        config:
+          secret_is_base64: false
+
+  # Notifications Service - уведомления
+  - name: notifications-service
+    url: http://notifications-service:3005
+    routes:
+      - name: notifications-routes
+        paths:
+          - /api/notifications
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          credentials: true
+      - name: jwt
+        config:
+          secret_is_base64: false
+
+  # Reports Service - отчеты и аналитика
+  - name: reports-service
+    url: http://reports-service:3006
+    routes:
+      - name: reports-routes
+        paths:
+          - /api/reports
+          - /api/analytics
+        strip_path: false
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          credentials: true
+      - name: jwt
+        config:
+          secret_is_base64: false
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 10
+
+  # Frontend - статические файлы веб-приложения
+  - name: frontend-service
+    url: http://frontend:80
+    routes:
+      - name: frontend-routes
+        paths:
+          - /
+        strip_path: false
+
+# Глобальные плагины
+plugins:
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - X-Gateway:Kong
+
+  # Логирование
+  - name: file-log
+    config:
+      path: /var/log/kong/access.log
+      reopen: true
+
+# Consumers (примеры для JWT)
+consumers:
+  - username: admin
+    custom_id: admin-user
+  - username: technician
+    custom_id: tech-user
+  - username: dispatcher
+    custom_id: dispatcher-user
