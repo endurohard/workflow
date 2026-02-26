@@ -1,0 +1,29 @@
+{
+  "name": "@workflow/cache",
+  "version": "1.0.0",
+  "description": "Shared Redis caching utilities for workflow microservices",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint . --ext .ts"
+  },
+  "keywords": ["redis", "cache", "microservices"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "redis": "^4.6.10"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.6",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  }
+}
