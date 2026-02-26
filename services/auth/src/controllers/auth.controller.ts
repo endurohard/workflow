@@ -1,167 +1,173 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { AuthService } from '../services/auth.service';
 
 export class AuthController {
-  async register(req: Request, res: Response): Promise<void> {
+  constructor(private authService: AuthService) {}
+
+  /**
+   * Register a new user
+   */
+  register = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email, password, role, firstName, lastName } = req.body;
-
-      // Валидация
-      if (!email || !password) {
-        res.status(400).json({ error: 'Email and password are required' });
-        return;
-      }
-
-      // Хеширование пароля
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // TODO: Сохранение в БД
-      // const user = await userRepository.create({ email, hashedPassword, role, firstName, lastName });
+      const result = await this.authService.register(req.body);
 
       res.status(201).json({
         message: 'User registered successfully',
-        user: {
-          email,
-          role: role || 'technician',
-          firstName,
-          lastName
-        }
+        ...result,
       });
     } catch (error) {
       console.error('Registration error:', error);
-      res.status(500).json({ error: 'Registration failed' });
-    }
-  }
 
-  async login(req: Request, res: Response): Promise<void> {
-    try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        res.status(400).json({ error: 'Email and password are required' });
-        return;
+      if (error instanceof Error) {
+        if (error.message.includes('already exists')) {
+          res.status(409).json({ error: error.message });
+          return;
+        }
       }
 
-      // TODO: Получение пользователя из БД
-      // const user = await userRepository.findByEmail(email);
-      // if (!user) {
-      //   res.status(401).json({ error: 'Invalid credentials' });
-      //   return;
-      // }
+      res.status(500).json({ error: 'Registration failed' });
+    }
+  };
 
-      // Проверка пароля
-      // const isPasswordValid = await bcrypt.compare(password, user.password);
-      // if (!isPasswordValid) {
-      //   res.status(401).json({ error: 'Invalid credentials' });
-      //   return;
-      // }
-
-      // Генерация JWT токена
-      const token = jwt.sign(
-        {
-          userId: 'user-id',
-          email,
-          role: 'technician'
-        },
-        process.env.JWT_SECRET || 'secret',
-        { expiresIn: '24h' }
-      );
-
-      const refreshToken = jwt.sign(
-        { userId: 'user-id' },
-        process.env.JWT_SECRET || 'secret',
-        { expiresIn: '7d' }
-      );
+  /**
+   * Login user
+   */
+  login = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email, password } = req.body;
+      const result = await this.authService.login(email, password);
 
       res.status(200).json({
         message: 'Login successful',
-        token,
-        refreshToken,
-        user: {
-          email,
-          role: 'technician'
-        }
+        ...result,
       });
     } catch (error) {
       console.error('Login error:', error);
+
+      if (error instanceof Error) {
+        if (
+          error.message.includes('Invalid credentials') ||
+          error.message.includes('deactivated')
+        ) {
+          res.status(401).json({ error: error.message });
+          return;
+        }
+      }
+
       res.status(500).json({ error: 'Login failed' });
     }
-  }
+  };
 
-  async refreshToken(req: Request, res: Response): Promise<void> {
+  /**
+   * Refresh access token
+   */
+  refreshToken = async (req: Request, res: Response): Promise<void> => {
     try {
       const { refreshToken } = req.body;
+      const result = await this.authService.refreshToken(refreshToken);
 
-      if (!refreshToken) {
-        res.status(400).json({ error: 'Refresh token is required' });
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Token refresh error:', error);
+
+      if (error instanceof Error) {
+        res.status(401).json({ error: error.message });
         return;
       }
 
-      // Проверка refresh токена
-      const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET || 'secret') as any;
-
-      // Генерация нового access токена
-      const newToken = jwt.sign(
-        {
-          userId: decoded.userId,
-          email: decoded.email,
-          role: decoded.role
-        },
-        process.env.JWT_SECRET || 'secret',
-        { expiresIn: '24h' }
-      );
-
-      res.status(200).json({
-        token: newToken
-      });
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      res.status(401).json({ error: 'Invalid refresh token' });
+      res.status(500).json({ error: 'Token refresh failed' });
     }
-  }
+  };
 
-  async logout(req: Request, res: Response): Promise<void> {
+  /**
+   * Logout user
+   */
+  logout = async (req: Request, res: Response): Promise<void> => {
     try {
-      // TODO: Добавить токен в blacklist в Redis
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.split(' ')[1];
+      const { refreshToken } = req.body;
+
+      if (!token) {
+        res.status(400).json({ error: 'Token required' });
+        return;
+      }
+
+      await this.authService.logout(token, refreshToken);
+
       res.status(200).json({ message: 'Logout successful' });
     } catch (error) {
       console.error('Logout error:', error);
       res.status(500).json({ error: 'Logout failed' });
     }
-  }
+  };
 
-  async forgotPassword(req: Request, res: Response): Promise<void> {
+  /**
+   * Forgot password
+   */
+  forgotPassword = async (req: Request, res: Response): Promise<void> => {
     try {
       const { email } = req.body;
+      const result = await this.authService.forgotPassword(email);
 
-      if (!email) {
-        res.status(400).json({ error: 'Email is required' });
-        return;
-      }
-
-      // TODO: Генерация токена сброса пароля и отправка email
-      res.status(200).json({ message: 'Password reset email sent' });
+      // In production, don't send token in response, send via email
+      res.status(200).json({
+        message: 'Password reset instructions sent to email',
+        // Remove this in production:
+        resetToken: result.resetToken,
+      });
     } catch (error) {
       console.error('Forgot password error:', error);
-      res.status(500).json({ error: 'Failed to process request' });
-    }
-  }
 
-  async resetPassword(req: Request, res: Response): Promise<void> {
+      // Always return success to prevent email enumeration
+      res.status(200).json({
+        message: 'If the email exists, a reset link will be sent',
+      });
+    }
+  };
+
+  /**
+   * Reset password
+   */
+  resetPassword = async (req: Request, res: Response): Promise<void> => {
     try {
       const { token, newPassword } = req.body;
+      await this.authService.resetPassword(token, newPassword);
 
-      if (!token || !newPassword) {
-        res.status(400).json({ error: 'Token and new password are required' });
-        return;
-      }
-
-      // TODO: Проверка токена и обновление пароля
       res.status(200).json({ message: 'Password reset successful' });
     } catch (error) {
       console.error('Reset password error:', error);
+
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
       res.status(500).json({ error: 'Password reset failed' });
     }
-  }
+  };
+
+  /**
+   * Get current user profile
+   */
+  getProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const user = await this.authService.getUserById(req.user.userId);
+
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      res.status(200).json({ user });
+    } catch (error) {
+      console.error('Get profile error:', error);
+      res.status(500).json({ error: 'Failed to get profile' });
+    }
+  };
 }
