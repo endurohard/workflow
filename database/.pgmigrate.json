@@ -1,0 +1,10 @@
+{
+  "databaseUrl": "postgres://serviceuser:servicepass@localhost:5432/service_manager",
+  "migrationsTable": "pgmigrations",
+  "dir": "migrations",
+  "direction": "up",
+  "count": 1,
+  "checkOrder": true,
+  "verbose": true,
+  "decamelize": false
+}
